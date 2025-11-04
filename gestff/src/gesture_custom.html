@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Configuration Manager</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles and font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Dark background */
+            color: #c9d1d9; /* Light text */
+        }
+        .card {
+            background-color: #161b22; /* Slightly lighter card background */
+            border: 1px solid #30363d; /* Subtle border */
+        }
+        .btn-primary {
+            background-color: #238636;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #2ea043;
+        }
+        .btn-blue {
+            background-color: #3b82f6;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .btn-blue:hover {
+            background-color: #2563eb;
+        }
+        /* Custom scrollbar for the table container */
+        .scroll-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .scroll-container::-webkit-scrollbar-thumb {
+            background-color: #484f58;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen">
+
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6 text-center text-blue-400">Gesture & Voice Customization</h1>
+        <p class="text-center mb-8 text-gray-400">
+            Define new gesture mappings similar to adding a fingerprint. Name your gesture, describe how to perform it, and map it to a specific command.
+        </p>
+
+        <!-- Current User Info & Status -->
+        <div id="status-message" class="mb-4 p-3 rounded-lg text-sm bg-yellow-900 text-yellow-300 hidden">
+            Initializing application and signing in...
+        </div>
+
+        <!-- 1. Add New Gesture Form (Multi-Step) -->
+        <div class="card p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">
+                <span id="step-title">Step 1: Define Gesture Details</span>
+            </h2>
+            <form id="gesture-form" class="space-y-4">
+                <!-- STEP 1: Metadata Inputs -->
+                <div id="step-1-content" class="space-y-4">
+                    <div>
+                        <label for="gesture-name" class="block text-sm font-medium mb-1">Gesture Name (e.g., 'Fist-to-Palm Swipe')</label>
+                        <input type="text" id="gesture-name" class="w-full px-4 py-2 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-blue-500 focus:border-blue-500" required placeholder="Unique identifier for the gesture">
+                    </div>
+                    <div>
+                        <label for="gesture-description" class="block text-sm font-medium mb-1">Description / Training Notes (e.g., 'Hand closed for 2 seconds, then open quickly')</label>
+                        <textarea id="gesture-description" rows="2" class="w-full px-4 py-2 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-blue-500 focus:border-blue-500" placeholder="Notes for training the model (in a real scenario)"></textarea>
+                    </div>
+                    <div>
+                        <label for="gesture-command" class="block text-sm font-medium mb-1">Mapped Action/Command (e.g., 'Open Spotify' or 'Volume Up')</label>
+                        <input type="text" id="gesture-command" class="w-full px-4 py-2 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-blue-500 focus:border-blue-500" required placeholder="The action your Python script should execute">
+                    </div>
+                </div>
+
+                <!-- STEP 2: Webcam Capture -->
+                <div id="step-2-content" class="hidden space-y-4 pt-4 text-center">
+                    <p class="text-sm text-gray-400">
+                        Please perform the gesture in front of the camera once the video feed loads. This simulates the gesture *enrollment* step.
+                    </p>
+                    <div class="flex flex-col items-center space-y-4">
+                        <video id="webcam-video" class="w-full max-w-lg aspect-video bg-gray-900 rounded-lg border-2 border-red-500 shadow-xl" autoplay muted></video>
+                        <p id="capture-status" class="text-lg font-mono text-green-400">Webcam Initializing...</p>
+                    </div>
+                </div>
+                
+                <!-- NAVIGATION / ACTION BUTTONS -->
+                <div class="flex justify-between pt-4">
+                    <button type="button" id="back-button" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-semibold hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                        Back
+                    </button>
+                    
+                    <button type="button" id="action-button" class="px-4 py-2 ml-auto btn-blue rounded-lg font-semibold">
+                        Next: Capture Gesture
+                    </button>
+
+                    <!-- Save button (hidden until final step) -->
+                    <button type="submit" id="final-save-button" class="px-4 py-2 ml-auto btn-primary rounded-lg font-semibold hidden">
+                        <span id="final-button-text">Confirm & Save Mapping</span>
+                        <span id="final-loading-spinner" class="hidden animate-spin h-5 w-5 border-4 border-t-transparent border-white rounded-full mx-auto"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 2. Current Custom Gestures List -->
+        <div class="card p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">Your Saved Gestures</h2>
+            <div id="gestures-container" class="scroll-container overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="bg-gray-800">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider rounded-tl-lg">Gesture Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Mapped Command</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden sm:table-cell">Description</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider rounded-tr-lg">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gestures-list" class="divide-y divide-gray-700">
+                        <!-- Gesture rows will be injected here by JavaScript -->
+                        <tr id="empty-state">
+                            <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                                No custom gestures saved yet. Add one above!
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Edit/Delete Confirmation (Required, as alert() is forbidden) -->
+    <div id="action-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 items-center justify-center">
+        <div class="card p-6 rounded-xl w-11/12 max-w-md space-y-4">
+            <h3 id="modal-title" class="text-xl font-semibold text-red-400">Confirm Deletion</h3>
+            <p id="modal-message">Are you sure you want to delete this custom gesture?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="modal-cancel" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-white">Cancel</button>
+                <button id="modal-confirm" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set log level to Debug for visibility in console
+        setLogLevel('Debug');
+
+        // --- GLOBAL VARIABLES (Provided by Canvas Environment) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db;
+        let auth;
+        let userId = null;
+        let collectionRef = null;
+        let currentStep = 1; // State variable for step tracking
+        let videoStream = null;
+
+        // --- DOM Elements ---
+        const statusMessage = document.getElementById('status-message');
+        const gestureForm = document.getElementById('gesture-form');
+        const gesturesList = document.getElementById('gestures-list');
+        const emptyState = document.getElementById('empty-state');
+        const stepTitle = document.getElementById('step-title');
+
+        // Step elements
+        const step1Content = document.getElementById('step-1-content');
+        const step2Content = document.getElementById('step-2-content');
+        const backButton = document.getElementById('back-button');
+        const actionButton = document.getElementById('action-button'); // Renamed 'next-button'
+        const finalSaveButton = document.getElementById('final-save-button');
+        const webcamVideo = document.getElementById('webcam-video');
+        const captureStatus = document.getElementById('capture-status');
+        
+        // Final save button components
+        const finalButtonText = document.getElementById('final-button-text');
+        const finalLoadingSpinner = document.getElementById('final-loading-spinner');
+
+        // Modal elements
+        const actionModal = document.getElementById('action-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalCancel = document.getElementById('modal-cancel');
+        const modalConfirm = document.getElementById('modal-confirm');
+
+        // --- 1. FIREBASE INITIALIZATION AND AUTHENTICATION ---
+
+        async function initializeFirebase() {
+            if (!firebaseConfig) {
+                console.error("Firebase config is missing. Cannot initialize.");
+                statusMessage.textContent = "Error: Firebase configuration is missing.";
+                statusMessage.classList.remove('bg-yellow-900', 'text-yellow-300');
+                statusMessage.classList.add('bg-red-900', 'text-red-300', 'block');
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Sign in using the provided custom token or anonymously
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Signed in with custom token.");
+                } else {
+                    await signInAnonymously(auth);
+                    console.log("Signed in anonymously.");
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        // Use a consistent collection path
+                        collectionRef = collection(db, `artifacts/${appId}/users/${userId}/custom_gestures`);
+                        console.log("Firestore ready. User ID:", userId);
+
+                        statusMessage.textContent = `User session ready (ID: ${userId}). Ready to configure gestures.`;
+                        statusMessage.classList.remove('bg-yellow-900', 'text-yellow-300');
+                        statusMessage.classList.add('bg-green-900', 'text-green-300', 'block');
+
+                        // Once authenticated, start listening to data
+                        setupRealtimeListener();
+
+                    } else {
+                        console.log("No user signed in.");
+                        userId = crypto.randomUUID(); // Fallback ID
+                        statusMessage.textContent = "Authentication failed or session expired. Functionality may be limited.";
+                        statusMessage.classList.remove('bg-yellow-900', 'text-yellow-300');
+                        statusMessage.classList.add('bg-red-900', 'text-red-300', 'block');
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error initializing Firebase or signing in:", error);
+                statusMessage.textContent = `Error during initialization: ${error.message}`;
+                statusMessage.classList.remove('bg-yellow-900', 'text-yellow-300');
+                statusMessage.classList.add('bg-red-900', 'text-red-300', 'block');
+            }
+        }
+
+        // --- 2. WEBCAM LOGIC ---
+
+        async function initWebcam() {
+            try {
+                captureStatus.textContent = "Webcam initializing...";
+                webcamVideo.srcObject = null;
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoStream = stream;
+                webcamVideo.srcObject = stream;
+                captureStatus.textContent = "Webcam is ON. Please perform your gesture now.";
+                webcamVideo.classList.remove('border-red-500');
+                webcamVideo.classList.add('border-green-500');
+
+            } catch (err) {
+                console.error("Error accessing the webcam: ", err);
+                captureStatus.textContent = "Error: Could not access webcam. Check permissions.";
+                webcamVideo.classList.remove('border-green-500');
+                webcamVideo.classList.add('border-red-500');
+            }
+        }
+
+        function stopWebcam() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+                webcamVideo.srcObject = null;
+                console.log("Webcam stopped.");
+            }
+        }
+
+        // --- 3. MULTI-STEP / NAVIGATION LOGIC ---
+
+        function updateStepUI() {
+            // Reset visibility
+            step1Content.classList.add('hidden');
+            step2Content.classList.add('hidden');
+            backButton.classList.add('hidden');
+            actionButton.classList.add('hidden');
+            finalSaveButton.classList.add('hidden');
+
+            if (currentStep === 1) {
+                stepTitle.textContent = "Step 1: Define Gesture Details";
+                step1Content.classList.remove('hidden');
+                actionButton.classList.remove('hidden');
+                actionButton.textContent = "Next: Capture Gesture";
+            } else if (currentStep === 2) {
+                stepTitle.textContent = "Step 2: Capture & Save Mapping";
+                step2Content.classList.remove('hidden');
+                backButton.classList.remove('hidden');
+                finalSaveButton.classList.remove('hidden');
+                initWebcam();
+            }
+        }
+
+        function goToStep(step) {
+            if (step === 1) {
+                stopWebcam();
+                currentStep = 1;
+                updateStepUI();
+                // If editing, reset the edit state when going back
+                resetFormState(false);
+            } else if (step === 2) {
+                // Pre-validation for step 1 fields
+                const name = document.getElementById('gesture-name').value.trim();
+                const command = document.getElementById('gesture-command').value.trim();
+
+                if (!name || !command) {
+                    // Custom message box to show validation error
+                    showModal('Required Fields', 'Please fill in the Gesture Name and Mapped Command before proceeding to capture.', null, 'info');
+                    return; 
+                }
+                
+                currentStep = 2;
+                updateStepUI();
+            }
+        }
+
+        // Navigation buttons
+        backButton.addEventListener('click', () => goToStep(1));
+        actionButton.addEventListener('click', () => goToStep(2));
+
+        // Form submission is now only for the final save
+        gestureForm.addEventListener('submit', handleFormSubmit);
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            // This function is only called when finalSaveButton (type="submit") is visible and clicked
+            if (currentStep === 2) {
+                addGestureMappingLogic();
+            }
+        }
+        
+        // --- 4. DATA OPERATIONS (CRUD) ---
+
+        /**
+         * The core logic to save the gesture mapping to Firestore.
+         */
+        async function addGestureMappingLogic(docId = null) {
+            if (!collectionRef) return;
+
+            const nameInput = document.getElementById('gesture-name');
+            const descriptionInput = document.getElementById('gesture-description');
+            const commandInput = document.getElementById('gesture-command');
+
+            const newGesture = {
+                name: nameInput.value.trim(),
+                description: descriptionInput.value.trim(),
+                command: commandInput.value.trim(),
+                // Placeholder: In a real system, you'd save a reference to the video/features
+                training_data_ref: `gestures/${nameInput.value.trim()}_${Date.now()}_video_data`, 
+                timestamp: Date.now() 
+            };
+            
+            // Show loading state
+            finalButtonText.classList.add('hidden');
+            finalLoadingSpinner.classList.remove('hidden');
+            finalSaveButton.disabled = true;
+
+            try {
+                if (docId) {
+                    await updateDoc(doc(collectionRef, docId), newGesture);
+                    console.log(`Document ${docId} updated successfully.`);
+                } else {
+                    await addDoc(collectionRef, newGesture);
+                    console.log("Gesture mapping added successfully.");
+                }
+                
+                // On success, reset UI to step 1
+                resetFormState(true); 
+                goToStep(1); 
+
+            } catch (e) {
+                console.error("Error saving document: ", e);
+            } finally {
+                // Hide loading state
+                finalButtonText.classList.remove('hidden');
+                finalLoadingSpinner.classList.add('hidden');
+                finalSaveButton.disabled = false;
+            }
+        }
+
+        /**
+         * Deletes a gesture mapping from Firestore.
+         */
+        async function deleteGestureMapping(docId) {
+            if (!collectionRef) return;
+            try {
+                await deleteDoc(doc(collectionRef, docId));
+                console.log(`Document ${docId} deleted successfully.`);
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+            }
+        }
+        
+        // Reset form and button state after update/cancel edit/save
+        function resetFormState(clearForm = true) {
+            stopWebcam();
+            if (clearForm) {
+                gestureForm.reset();
+            }
+            // Reset button text/color from edit state (blue) to initial state (blue for next)
+            actionButton.classList.add('btn-blue', 'hover:bg-blue-700');
+            actionButton.classList.remove('btn-primary', 'hover:bg-green-700');
+            actionButton.textContent = "Next: Capture Gesture";
+
+            // Ensure we are back to the initial step on form submission
+            if (currentStep !== 1) {
+                currentStep = 1;
+                updateStepUI();
+            }
+        }
+
+
+        /**
+         * Renders the list of gestures from the Firestore snapshot.
+         */
+        function renderGestures(gestures) {
+            gesturesList.innerHTML = ''; // Clear existing list
+
+            if (gestures.length === 0) {
+                emptyState.classList.remove('hidden');
+                gesturesList.appendChild(emptyState);
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+
+            gestures.forEach(gesture => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-800 transition duration-150';
+
+                tr.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap font-medium text-white">${gesture.name}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-green-400 font-mono">${gesture.command}</td>
+                    <td class="px-4 py-3 text-sm text-gray-400 hidden sm:table-cell">${gesture.description || 'N/A'}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-right space-x-2">
+                        <!-- Edit button -->
+                        <button data-id="${gesture.id}" data-name="${gesture.name}" data-command="${gesture.command}" data-description="${gesture.description}" class="text-blue-400 hover:text-blue-300 font-medium text-sm edit-btn">
+                            Edit
+                        </button>
+                        <!-- Delete button -->
+                        <button data-id="${gesture.id}" class="text-red-400 hover:text-red-300 font-medium text-sm delete-btn">
+                            Delete
+                        </button>
+                    </td>
+                `;
+                gesturesList.appendChild(tr);
+            });
+        }
+
+        /**
+         * Sets up the real-time listener for the custom_gestures collection.
+         */
+        function setupRealtimeListener() {
+            if (!collectionRef) return;
+
+            // Use onSnapshot for real-time updates
+            onSnapshot(collectionRef, (snapshot) => {
+                const gestures = [];
+                snapshot.forEach((doc) => {
+                    gestures.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Sort by timestamp descending (newest first)
+                gestures.sort((a, b) => b.timestamp - a.timestamp);
+
+                renderGestures(gestures);
+                console.log("Real-time gesture list updated.");
+            }, (error) => {
+                console.error("Error fetching documents: ", error);
+            });
+        }
+
+
+        // --- 5. EVENT DELEGATION FOR EDIT/DELETE ---
+
+        // Delegation for Edit/Delete buttons
+        gesturesList.addEventListener('click', (e) => {
+            const target = e.target;
+
+            if (target.classList.contains('delete-btn')) {
+                const docId = target.dataset.id;
+                // Get gesture name for better confirmation message
+                const gestureName = target.parentNode.previousElementSibling.previousElementSibling.previousElementSibling.textContent;
+                showModal('Confirm Deletion', `Are you sure you want to delete the mapping for gesture: "${gestureName}"?`, docId, 'delete');
+            } else if (target.classList.contains('edit-btn')) {
+                // When 'Edit' is clicked, populate the form for editing
+                const docId = target.dataset.id;
+                const name = target.dataset.name;
+                const command = target.dataset.command;
+                const description = target.dataset.description;
+
+                document.getElementById('gesture-name').value = name;
+                document.getElementById('gesture-description').value = description;
+                document.getElementById('gesture-command').value = command;
+
+                // Set up the form for update mode (skipping webcam step for edit simplicity)
+                stepTitle.textContent = "Editing Existing Gesture";
+                actionButton.classList.add('hidden');
+                backButton.classList.remove('hidden'); // Allow user to cancel edit
+                finalSaveButton.classList.remove('hidden');
+                finalSaveButton.classList.remove('btn-primary');
+                finalSaveButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                finalButtonText.textContent = "Update Gesture Mapping";
+                
+                // Temporarily change form submit action to update
+                gestureForm.removeEventListener('submit', handleFormSubmit);
+                gestureForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    addGestureMappingLogic(docId); // Re-use save logic with docId
+                });
+
+                // Scroll to top of the form
+                gestureForm.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+        
+        // --- 6. MODAL LOGIC (for confirmation messages) ---
+
+        function showModal(title, message, docId, actionType) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            // Clear previous listeners and set up confirmation button based on action type
+            modalConfirm.onclick = null; 
+            modalConfirm.classList.remove('hidden'); // Default is visible for confirmations
+
+            if (actionType === 'delete') {
+                modalTitle.classList.add('text-red-400');
+                modalTitle.classList.remove('text-blue-400');
+                modalConfirm.textContent = 'Confirm Delete';
+                modalConfirm.classList.add('bg-red-600', 'hover:bg-red-700');
+                modalConfirm.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                modalConfirm.onclick = () => {
+                    deleteGestureMapping(docId);
+                    actionModal.classList.add('hidden');
+                };
+            } else if (actionType === 'info') {
+                // For validation or informational messages
+                modalTitle.classList.add('text-blue-400');
+                modalTitle.classList.remove('text-red-400');
+                modalConfirm.textContent = 'OK';
+                modalConfirm.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                modalConfirm.classList.remove('bg-red-600', 'hover:bg-red-700');
+                modalConfirm.onclick = () => {
+                    actionModal.classList.add('hidden');
+                };
+            }
+            
+            modalCancel.onclick = () => {
+                actionModal.classList.add('hidden');
+            };
+
+            // Hide cancel button for info messages
+            if (actionType === 'info') {
+                modalCancel.classList.add('hidden');
+            } else {
+                modalCancel.classList.remove('hidden');
+            }
+
+
+            actionModal.classList.remove('hidden');
+            actionModal.classList.add('flex');
+        }
+
+        // --- INITIALIZATION ---
+        initializeFirebase();
+        updateStepUI(); // Initial UI setup
+    </script>
+
+</body>
+</html>

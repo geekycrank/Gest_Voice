@@ -1,0 +1,32 @@
+# Core Dependencies
+eel>=0.16.0                    # For web UI with Python backend
+pyautogui>=0.9.54              # Mouse and keyboard automation
+pynput>=1.7.6                  # Keyboard and mouse control
+
+# Speech Recognition & Text-to-Speech
+pyttsx3>=2.90                  # Text-to-speech engine
+SpeechRecognition>=3.10.0      # Speech recognition library
+
+# Computer Vision & MediaPipe
+opencv-python>=4.8.0           # Computer vision library (cv2)
+mediapipe>=0.10.0              # MediaPipe for hand tracking
+
+# System Control
+pycaw>=20220416                # Windows audio control
+screen-brightness-control>=0.19.0  # Screen brightness control
+comtypes>=1.2.0                # COM interface for Windows
+
+# Web & External Services
+wikipedia>=1.4.0                # Wikipedia API
+# mediapipe requires protobuf <4; pin to a compatible version
+protobuf==3.20.3               # Protocol buffers (Google)
+
+# Built-in Modules (no installation needed):
+# - datetime, time, os, sys
+# - queue, threading
+# - webbrowser
+# - smtplib
+# - subprocess
+# - difflib (SequenceMatcher)
+
+
